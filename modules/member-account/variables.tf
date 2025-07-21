@@ -1,5 +1,4 @@
 # Member Account Module Variables
-# Copilot is now acting as: AWS Architect (see ../../../organization/config/copilot_role/aws_architect.md)
 
 variable "name" {
   description = "A friendly name for the member account"

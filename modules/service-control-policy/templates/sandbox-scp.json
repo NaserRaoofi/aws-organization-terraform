@@ -44,17 +44,7 @@
       ],
       "Resource": "*"
     },
-    {
-      "Sid": "AllowSandboxExperimentation",
-      "Effect": "Allow",
-      "Action": "*",
-      "Resource": "*",
-      "Condition": {
-        "StringEquals": {
-          "aws:RequestTag/Environment": "sandbox"
-        }
-      }
-    },
+
     {
       "Sid": "DenyDataDeletion",
       "Effect": "Deny",
