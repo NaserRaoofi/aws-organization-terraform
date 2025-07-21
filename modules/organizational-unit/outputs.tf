@@ -1,5 +1,4 @@
 # Organizational Unit Module Outputs
-# Copilot is now acting as: AWS Architect (see ../../../organization/config/copilot_role/aws_architect.md)
 
 output "id" {
   description = "The organizational unit ID"

@@ -1,5 +1,4 @@
 # Organizational Unit Module
-# Copilot is now acting as: AWS Architect (see ../../../organization/config/copilot_role/aws_architect.md)
 
 terraform {
   required_providers {

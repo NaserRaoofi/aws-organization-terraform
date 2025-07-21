@@ -78,71 +78,93 @@ locals {
   }
 }
 
+# Data sources for existing organizational units
+data "aws_organizations_organizational_units" "existing_ous" {
+  parent_id = data.aws_organizations_organization.existing.roots[0].id
+}
+
+# Reference existing organizational units by name
+locals {
+  existing_ous = {
+    for ou in data.aws_organizations_organizational_units.existing_ous.children :
+    lower(ou.name) => ou.id
+  }
+}
+
+# COMMENTED OUT - Use existing OUs instead of creating new ones
 # Create Organizational Units
-module "organizational_units" {
-  source = "../../modules/organizational-unit"
-  
-  for_each = local.organizational_units
-  
-  name                       = each.value.name
-  parent_id                 = data.aws_organizations_organization.existing.roots[0].id
-  service_control_policy_ids = each.value.service_control_policy_ids
-  
-  default_tags = var.default_tags
-  tags = {
-    Environment = each.key
-    Purpose     = "Organizational unit for ${each.value.name} workloads"
-  }
-}
+# module "organizational_units" {
+#   source = "../../modules/organizational-unit"
+#   
+#   for_each = local.organizational_units
+#   
+#   name                       = each.value.name
+#   parent_id                 = data.aws_organizations_organization.existing.roots[0].id
+#   service_control_policy_ids = each.value.service_control_policy_ids
+#   
+#   default_tags = var.default_tags
+#   tags = {
+#     Environment = each.key
+#     Purpose     = "Organizational unit for ${each.value.name} workloads"
+#   }
+# }
 
+# COMMENTED OUT - Use existing accounts instead of creating new ones
 # Create Member Accounts
-module "member_accounts" {
-  source = "../../modules/member-account"
-  
-  for_each = local.member_accounts
-  
-  name         = each.value.name
-  email        = each.value.email
-  environment  = each.value.environment
-  parent_id    = module.organizational_units[each.value.ou_key].id
-  
-  # Account settings
-  role_name                  = "OrganizationAccountAccessRole"
-  close_on_deletion         = false
-  create_govcloud           = false
-  iam_user_access_to_billing = "ALLOW"
-  account_setup_wait_time   = "90s"
-  
-  default_tags = var.default_tags
-  tags = {
-    Environment = each.value.environment
-    Purpose     = "${each.value.name} for ${each.value.environment} workloads"
-    Owner       = "platform-team"
-  }
-  
-  depends_on = [module.organizational_units]
-}
+# module "member_accounts" {
+#   source = "../../modules/member-account"
+#   
+#   for_each = local.member_accounts
+#   
+#   name         = each.value.name
+#   email        = each.value.email
+#   environment  = each.value.environment
+#   parent_id    = module.organizational_units[each.value.ou_key].id
+#   
+#   # Account settings
+#   role_name                  = "OrganizationAccountAccessRole"
+#   close_on_deletion         = false
+#   create_govcloud           = false
+#   iam_user_access_to_billing = "ALLOW"
+#   account_setup_wait_time   = "90s"
+#   
+#   default_tags = var.default_tags
+#   tags = {
+#     Environment = each.value.environment
+#     Purpose     = "${each.value.name} for ${each.value.environment} workloads"
+#     Owner       = "platform-team"
+#   }
+#   
+#   depends_on = [module.organizational_units]
+# }
 
-# Service Control Policies using templates
+# Service Control Policies with Direct OU Attachment
 module "scp_policies" {
   source = "../../modules/service-control-policy"
   
   for_each = {
     development = {
       template_name = "development-scp"
+      ou_id        = local.existing_ous["development"]
     }
-    staging = {
-      template_name = "development-scp"  # Use same template as dev
+    production = {
+      template_name = "production-scp"
+      ou_id        = local.existing_ous["production"]
     }
     sandbox = {
       template_name = "sandbox-scp"
+      ou_id        = local.existing_ous["sandbox"]
     }
   }
 
   # Core Configuration
-  name          = "${each.key}-ou-security-policy"
-  template_name = each.value.template_name
-  environment   = each.key
+  name           = "${each.key}-ou-security-policy"
+  template_name  = each.value.template_name
+  target_ou_id   = each.value.ou_id
+  environment    = each.key
+  
+  # No need for IAM policy creation with direct OU attachment
+  create_iam_policy = false
   
   # Enhanced Tagging
   default_tags = merge(var.default_tags, {
@@ -156,7 +178,8 @@ module "scp_policies" {
     Template       = each.value.template_name
     DeploymentDate = "2025-07-21"
     LastReview     = "2025-07-21"
+    AttachedToOU   = each.value.ou_id
   }
-  
-  depends_on = [module.organizational_units]
 }
+
+

@@ -1,5 +1,4 @@
 # Organizational Unit Module Variables
-# Copilot is now acting as: AWS Architect (see ../../../organization/config/copilot_role/aws_architect.md)
 
 variable "name" {
   description = "The name of the organizational unit"

@@ -1,5 +1,5 @@
 # Service Control Policy Module Variables
-# IAM policy creation from SCP templates
+# Simple template-based SCP management
 
 variable "name" {
   description = "Name of the Service Control Policy"
@@ -40,4 +40,16 @@ variable "tags" {
   description = "Additional tags to apply to resources"
   type        = map(string)
   default     = {}
+}
+
+variable "target_ou_id" {
+  description = "Organizational Unit ID to attach the SCP to (optional)"
+  type        = string
+  default     = null
+}
+
+variable "create_iam_policy" {
+  description = "Whether to create an IAM policy version of the SCP"
+  type        = bool
+  default     = false
 }
