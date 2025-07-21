@@ -1,5 +1,4 @@
 # Service Control Policy Module Outputs
-# Enterprise-grade SCP outputs
 
 output "policy_id" {
   description = "The unique identifier of the Service Control Policy"
@@ -16,30 +15,17 @@ output "policy_name" {
   value       = aws_organizations_policy.this.name
 }
 
-output "policy_description" {
-  description = "The description of the Service Control Policy"
-  value       = aws_organizations_policy.this.description
+output "template_name" {
+  description = "Name of the template used (if template-based deployment)"
+  value       = var.template_name
 }
 
-output "policy_type" {
-  description = "The type of the policy (SERVICE_CONTROL_POLICY)"
-  value       = aws_organizations_policy.this.type
+output "iam_policy_arn" {
+  description = "ARN of the IAM policy version"
+  value       = aws_iam_policy.scp_as_iam_policy.arn
 }
 
-output "attachment_ids" {
-  description = "Map of target IDs to their attachment IDs"
-  value = {
-    for k, v in aws_organizations_policy_attachment.this : k => v.id
-  }
-}
-
-output "target_ids" {
-  description = "List of target IDs where the policy is attached"
-  value       = var.target_ids
-}
-
-output "policy_document" {
-  description = "The policy document content"
-  value       = var.policy_document
-  sensitive   = true
+output "iam_policy_name" {
+  description = "Name of the IAM policy version"
+  value       = aws_iam_policy.scp_as_iam_policy.name
 }
