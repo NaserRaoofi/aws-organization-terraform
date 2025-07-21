@@ -1,6 +1,5 @@
-# Cross-Account IAM Module
-# Enterprise-grade cross-account IAM role management
-# Copilot acting as: AWS Architect
+# Cross-Account IAM Module with OU-based Roles
+# Simple role management for organizational units
 
 terraform {
   required_providers {
@@ -17,95 +16,77 @@ data "aws_caller_identity" "current" {}
 # Data source for organization
 data "aws_organizations_organization" "current" {}
 
-# Cross-Account Assumable Role
-resource "aws_iam_role" "cross_account_role" {
-  name               = var.role_name
-  path               = var.role_path
-  description        = var.role_description
-  max_session_duration = var.max_session_duration
+# Create roles for each organizational unit
+resource "aws_iam_role" "ou_roles" {
+  for_each = var.organizational_units
 
+  name        = "${each.key}-ou-role"
+  description = "Role for ${each.key} organizational unit"
+  
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
         Effect = "Allow"
         Principal = {
-          AWS = var.trusted_account_ids
+          AWS = each.value.trusted_accounts
         }
         Action = "sts:AssumeRole"
-        Condition = var.assume_role_conditions
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = var.allowed_regions
+          }
+        }
       }
     ]
   })
 
-  tags = merge(var.default_tags, var.tags, {
-    Name            = var.role_name
-    Type            = "CrossAccountRole"
+  tags = merge(var.default_tags, {
+    Name            = "${each.key}-ou-role"
+    OrganizationalUnit = each.key
     Environment     = var.environment
-    TrustedAccounts = join(",", var.trusted_account_ids)
+    Type           = "OURole"
   })
+}
 
-  lifecycle {
-    prevent_destroy = true
+# Attach policies to OU roles
+resource "aws_iam_role_policy_attachment" "ou_policies" {
+  for_each = {
+    for combo in local.role_policy_combinations : "${combo.role}-${combo.policy}" => combo
   }
+
+  role       = aws_iam_role.ou_roles[each.value.role].name
+  policy_arn = each.value.policy_arn
 }
 
-# Attach AWS managed policies
-resource "aws_iam_role_policy_attachment" "aws_managed" {
-  for_each = toset(var.aws_managed_policy_arns)
-  
-  role       = aws_iam_role.cross_account_role.name
-  policy_arn = each.value
-
-  depends_on = [aws_iam_role.cross_account_role]
-}
-
-# Create and attach custom inline policy if provided
-resource "aws_iam_role_policy" "custom_inline" {
-  count = var.custom_policy_document != null ? 1 : 0
-  
-  name   = "${var.role_name}-custom-policy"
-  role   = aws_iam_role.cross_account_role.id
-  policy = var.custom_policy_document
-
-  depends_on = [aws_iam_role.cross_account_role]
-}
-
-# Permission boundary if specified
-resource "aws_iam_role_policy_attachment" "permission_boundary" {
-  count = var.permissions_boundary_arn != null ? 1 : 0
-  
-  role       = aws_iam_role.cross_account_role.name
-  policy_arn = var.permissions_boundary_arn
-
-  depends_on = [aws_iam_role.cross_account_role]
-}
-
-# Instance profile for EC2 if needed
-resource "aws_iam_instance_profile" "cross_account_profile" {
-  count = var.create_instance_profile ? 1 : 0
-  
-  name = "${var.role_name}-instance-profile"
-  role = aws_iam_role.cross_account_role.name
-  path = var.role_path
-
-  tags = merge(var.default_tags, var.tags, {
-    Name        = "${var.role_name}-instance-profile"
-    Type        = "InstanceProfile"
-    Environment = var.environment
-  })
-
-  depends_on = [aws_iam_role.cross_account_role]
-}
-
-# Local validation
+# Local combinations for role-policy attachments
 locals {
-  # Validate trusted account IDs
-  invalid_account_ids = [
-    for account_id in var.trusted_account_ids : account_id
-    if !can(regex("^[0-9]{12}$", account_id))
-  ]
-  
-  # Check if any invalid account IDs exist
-  has_invalid_accounts = length(local.invalid_account_ids) > 0
+  role_policy_combinations = flatten([
+    for ou_name, ou_config in var.organizational_units : [
+      for policy_arn in ou_config.policy_arns : {
+        role       = ou_name
+        policy_arn = policy_arn
+      }
+    ]
+  ])
+}
+
+# Create IAM roles delegation configuration for OUs
+# This creates a mapping between roles and their target OUs
+resource "aws_ssm_parameter" "ou_role_mapping" {
+  for_each = var.organizational_units
+
+  name  = "/organization/ou-roles/${each.key}/role-arn"
+  type  = "String"
+  value = aws_iam_role.ou_roles[each.key].arn
+  description = "Role ARN for ${each.key} organizational unit (${each.value.ou_id})"
+
+  tags = merge(var.default_tags, {
+    Name               = "${each.key}-ou-role-mapping"
+    OrganizationalUnit = each.key
+    OrganizationalUnitId = each.value.ou_id
+    RoleName          = aws_iam_role.ou_roles[each.key].name
+    Environment       = var.environment
+    Type              = "OURoleMapping"
+  })
 }

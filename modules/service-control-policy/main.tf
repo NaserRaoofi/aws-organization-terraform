@@ -1,6 +1,5 @@
 # Service Control Policy Module
-# Enterprise-grade SCP management for AWS Organizations
-# Copilot acting as: AWS Architect
+# Simple template-based SCP management with IAM role integration
 
 terraform {
   required_providers {
@@ -11,44 +10,36 @@ terraform {
   }
 }
 
+# Load policy template or use custom document
+locals {
+  policy_content = var.template_name != null ? file("${path.module}/templates/${var.template_name}.json") : var.policy_document
+}
+
 # Create Service Control Policy
 resource "aws_organizations_policy" "this" {
   name        = var.name
   description = var.description
   type        = "SERVICE_CONTROL_POLICY"
-  content     = var.policy_document
+  content     = local.policy_content
 
   tags = merge(var.default_tags, var.tags, {
     Name        = var.name
     Type        = "ServiceControlPolicy"
     Environment = var.environment
+    Template    = var.template_name
   })
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
-# Attach SCP to targets (OUs or accounts)
-resource "aws_organizations_policy_attachment" "this" {
-  for_each = toset(var.target_ids)
-  
-  policy_id = aws_organizations_policy.this.id
-  target_id = each.value
+# Create IAM policy from SCP content for role attachment
+resource "aws_iam_policy" "scp_as_iam_policy" {
+  name        = "${var.name}-iam-policy"
+  description = "IAM policy based on SCP: ${var.description}"
+  policy      = local.policy_content
 
-  depends_on = [aws_organizations_policy.this]
-}
-
-# Data source to validate targets
-data "aws_organizations_organization" "current" {}
-
-# Local validation
-locals {
-  # Validate that all target IDs are valid OU or account IDs
-  valid_target_pattern = "^(r-[0-9a-z]{4,32}|ou-[0-9a-z]{4,32}-[a-z0-9]{8,32}|[0-9]{12})$"
-  
-  invalid_targets = [
-    for target in var.target_ids : target
-    if !can(regex(local.valid_target_pattern, target))
-  ]
+  tags = merge(var.default_tags, var.tags, {
+    Name        = "${var.name}-iam-policy"
+    Type        = "IAMPolicy"
+    Environment = var.environment
+    SourceSCP   = var.name
+  })
 }
