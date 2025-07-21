@@ -295,11 +295,7 @@ This project demonstrates **enterprise-level cloud architecture skills** essenti
 - **Platform Teams** building developer-friendly guardrails
 - **FinOps Practitioners** controlling cloud costs
 
-## 📞 Contact & Support
 
-- **Author**: [Naser Raoofi](https://github.com/NaserRaoofi)
-- **Project**: [AWS Organization Terraform](https://github.com/NaserRaoofi/aws-organization-terraform)
-- **Issues**: [GitHub Issues](https://github.com/NaserRaoofi/aws-organization-terraform/issues)
 
 ## 📄 License
 
@@ -309,10 +305,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**⭐ If this project helped you, please give it a star! ⭐**
 
-[🔗 View Live Demo](https://console.aws.amazon.com/organizations/) | [📖 Documentation](docs/) | [🚀 Deploy Now](#deployment-steps)
-
-</div>
 
 
